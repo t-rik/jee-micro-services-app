@@ -1,0 +1,56 @@
+<div class="container" *ngIf="orderDetails">
+  <div class="row">
+    <div class="col-md-6">
+      <div class="card shadow mb-4">
+        <div class="card-header py-3">
+          <h6 class="m-0 font-weight-bold text-primary">Order ID: {{orderDetails.id}}</h6>
+        </div>
+        <div class="card-body">
+          <ul class="list-group list-group-flush">
+            <li class="list-group-item"><strong>Order Id :</strong> {{orderDetails.id}}</li>
+            <li class="list-group-item"><strong>Date :</strong> {{orderDetails.createdAt | date : 'dd/MM/yyyy'}}</li>
+            <li class="list-group-item"><strong>Status :</strong> {{orderDetails.status}}</li>
+            <li class="list-group-item"><strong>Customer Id :</strong> {{orderDetails.customerId}}</li>
+            <li class="list-group-item"><strong>Customer Name :</strong> {{orderDetails.customer.name}}</li>
+            <li class="list-group-item"><strong>Customer Email :</strong> {{orderDetails.customer.email}}</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="card shadow mb-4">
+        <div class="card-header py-3">
+          <h6 class="m-0 font-weight-bold text-primary">Product Items</h6>
+        </div>
+        <div class="card-body">
+          <table class="table table-bordered table-sm">
+            <thead class="table-dark">
+            <tr>
+              <th>Product Id</th>
+              <th>Product Name</th>
+              <th>Quantity</th>
+              <th>Price</th>
+              <th>Discount</th>
+              <th>Amount</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr *ngFor="let pi of orderDetails.productItems">
+              <td>{{pi.product.id}}</td>
+              <td>{{pi.product.name}}</td>
+              <td>{{pi.quantity}}</td>
+              <td>{{pi.price | number : '0.2-2'}}</td>
+              <td>{{pi.discount | number : '0.2-2'}}</td>
+              <td>{{pi.amount | number : '0.2-2'}}</td>
+            </tr>
+            <tr class="table-dark">
+              <td colspan="5" class="text-end"><strong>Total</strong></td>
+              <td><strong>{{getTotal(orderDetails) | number : '0.2-2'}}</strong></td>
+            </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,45 @@
+target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/resources/archetype-resources/google-services.json
+!**/src/test/resources/archetype-resources/google-services.json
+!**/src/main/resources/google-services.json
+!**/src/test/resources/google-services.json
+
+### STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+bin/
+!**/src/main/java/**/bin/
+!**/src/test/java/**/bin/
+
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
+out/
+!**/src/main/resources/archetype-resources/google-services.json
+!**/src/test/resources/archetype-resources/google-services.json
+!**/src/main/resources/google-services.json
+!**/src/test/resources/google-services.json
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+
+### VS Code ###
+.vscode/
+
+### Node ###
+node_modules/
+dist/
+.angular/
+.npm/

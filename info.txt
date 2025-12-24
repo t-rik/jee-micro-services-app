@@ -1,0 +1,1429 @@
+Here is the lossless transcription of the codebase and development process presented in the video.
+
+1. Terminal & Environment
+
+Commands Executed:
+
+code
+Bash
+download
+content_copy
+expand_less
+# Create the Angular project (CSS selected)
+ng new ecom-web-app
+
+# Install Bootstrap and Bootstrap Icons
+npm install --save bootstrap bootstrap-icons
+
+# Start the Angular development server
+ng serve
+
+# Generate Components
+ng g c products
+ng g c customers
+ng g c orders
+ng g c order-details
+2. Configuration & Dependencies
+angular.json
+
+Modifications to include Bootstrap styles and scripts.
+
+code
+JSON
+download
+content_copy
+expand_less
+{
+  "projects": {
+    "ecom-web-app": {
+      "architect": {
+        "build": {
+          "options": {
+            "styles": [
+              "src/styles.css",
+              "node_modules/bootstrap/dist/css/bootstrap.min.css"
+            ],
+            "scripts": [
+              "node_modules/bootstrap/dist/js/bootstrap.bundle.js"
+            ]
+          }
+        }
+      }
+    }
+  }
+}
+app.module.ts
+
+Importing HttpClientModule.
+
+code
+TypeScript
+download
+content_copy
+expand_less
+import { NgModule } from '@angular/core';
+import { BrowserModule } from '@angular/platform-browser';
+import { AppRoutingModule } from './app-routing.module';
+import { AppComponent } from './app.component';
+import { ProductsComponent } from './products/products.component';
+import { HttpClientModule } from '@angular/common/http';
+import { CustomersComponent } from './customers/customers.component';
+import { OrdersComponent } from './orders/orders.component';
+import { OrderDetailsComponent } from './order-details/order-details.component';
+
+@NgModule({
+  declarations: [
+    AppComponent,
+    ProductsComponent,
+    CustomersComponent,
+    OrdersComponent,
+    OrderDetailsComponent
+  ],
+  imports: [
+    BrowserModule,
+    AppRoutingModule,
+    HttpClientModule
+  ],
+  providers: [],
+  bootstrap: [AppComponent]
+})
+export class AppModule { }
+app-routing.module.ts
+
+Defining the application routes.
+
+code
+TypeScript
+download
+content_copy
+expand_less
+import { NgModule } from '@angular/core';
+import { RouterModule, Routes } from '@angular/router';
+import { ProductsComponent } from './products/products.component';
+import { CustomersComponent } from './customers/customers.component';
+import { OrdersComponent } from './orders/orders.component';
+import { OrderDetailsComponent } from './order-details/order-details.component';
+
+const routes: Routes = [
+  { path: "products", component: ProductsComponent },
+  { path: "customers", component: CustomersComponent },
+  { path: "orders/:customerId", component: OrdersComponent },
+  { path: "order-details/:orderId", component: OrderDetailsComponent }
+];
+
+@NgModule({
+  imports: [RouterModule.forRoot(routes)],
+  exports: [RouterModule]
+})
+export class AppRoutingModule { }
+Backend Configuration: application.yml (Gateway Service)
+
+Configuration to handle CORS (Cross-Origin Resource Sharing) to allow the Angular app on port 4200 to communicate with the Gateway on port 9999.
+
+code
+Yaml
+download
+content_copy
+expand_less
+spring:
+  cloud:
+    gateway:
+      globalcors:
+        corsConfigurations:
+          '[/**]':
+            allowedOrigins: "http://localhost:4200"
+            allowedHeaders: "*"
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - DELETE
+3. Backend (Spring Boot/Java)
+OrderRepository.java
+
+Added a custom search method exposed via Spring Data REST.
+
+code
+Java
+download
+content_copy
+expand_less
+package org.sid.orderservice.repositories;
+
+import org.sid.orderservice.entities.Order;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.repository.query.Param;
+import org.springframework.data.rest.core.annotation.RepositoryRestResource;
+import org.springframework.data.rest.core.annotation.RestResource;
+import java.util.List;
+
+@RepositoryRestResource
+public interface OrderRepository extends JpaRepository<Order, Long> {
+    @RestResource(path = "/byCustomerId")
+    List<Order> findByCustomerId(@Param("customerId") Long customerId);
+}
+OrderProjection.java
+
+Projection to expose full order details including the relationship getProductItems.
+
+code
+Java
+download
+content_copy
+expand_less
+package org.sid.orderservice.entities;
+
+import org.springframework.data.rest.core.config.Projection;
+import java.util.Collection;
+import java.util.Date;
+import org.sid.orderservice.enums.OrderStatus;
+
+@Projection(name = "fullOrder", types = Order.class)
+public interface OrderProjection {
+    Long getId();
+    Date getCreatedAt();
+    Long getCustomerId();
+    OrderStatus getStatus();
+    Collection<ProductItem> getProductItems();
+}
+Order.java
+
+Added a @Transient method to calculate the total price of the order dynamically based on product items.
+
+code
+Java
+download
+content_copy
+expand_less
+// ... imports
+
+@Entity
+@Table(name="orders")
+@Data @NoArgsConstructor @AllArgsConstructor @Builder
+public class Order {
+    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    private Date createdAt;
+    private OrderStatus status;
+    private Long customerId;
+    @Transient
+    private Customer customer;
+    @OneToMany(mappedBy = "order")
+    private List<ProductItem> productItems;
+
+    @Transient
+    public double getTotal() {
+        double somme = 0;
+        for (ProductItem pi : productItems) {
+            somme += pi.getPrice() * pi.getQuantity() * (1 - pi.getDiscount());
+        }
+        return somme;
+    }
+}
+4. Frontend (Angular)
+app.component.html (Navbar)
+code
+Html
+play_circle
+download
+content_copy
+expand_less
+<nav class="navbar navbar-expand-sm bg-light navbar-light">
+  <div class="container-fluid">
+    <ul class="navbar-nav">
+      <li class="nav-item">
+        <a class="nav-link active" routerLink="/products">Products</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" routerLink="/customers">Customers</a>
+      </li>
+      <li class="nav-item dropdown">
+        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">Dropdown</a>
+        <ul class="dropdown-menu">
+          <li><a class="dropdown-item" href="#">Link</a></li>
+        </ul>
+      </li>
+    </ul>
+  </div>
+</nav>
+<div class="container mt-2">
+  <router-outlet></router-outlet>
+</div>
+A. Products Component
+
+products.component.ts
+
+code
+TypeScript
+download
+content_copy
+expand_less
+import { Component, OnInit } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+
+@Component({
+  selector: 'app-products',
+  templateUrl: './products.component.html',
+  styleUrls: ['./products.component.css']
+})
+export class ProductsComponent implements OnInit {
+  products: any;
+
+  constructor(private http: HttpClient) { }
+
+  ngOnInit(): void {
+    this.http.get("http://localhost:9999/inventory-service/products")
+      .subscribe({
+        next: (data) => {
+          this.products = data;
+        },
+        error: (err) => { }
+      });
+  }
+}
+
+products.component.html
+
+code
+Html
+play_circle
+download
+content_copy
+expand_less
+<div class="container">
+  <table class="table" *ngIf="products">
+    <thead>
+      <tr>
+        <th>ID</th><th>Name</th><th>Price</th><th>Quantity</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let p of products._embedded.products">
+        <td>{{p.id}}</td>
+        <td>{{p.name}}</td>
+        <td>{{p.price}}</td>
+        <td>{{p.quantity}}</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+B. Customers Component
+
+customers.component.ts
+
+code
+TypeScript
+download
+content_copy
+expand_less
+import { Component, OnInit } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Router } from '@angular/router';
+
+@Component({
+  selector: 'app-customers',
+  templateUrl: './customers.component.html',
+  styleUrls: ['./customers.component.css']
+})
+export class CustomersComponent implements OnInit {
+  customers: any;
+
+  constructor(private http: HttpClient, private router: Router) { }
+
+  ngOnInit(): void {
+    this.http.get("http://localhost:9999/customer-service/customers")
+      .subscribe({
+        next: (data) => {
+          this.customers = data;
+        },
+        error: (err) => { }
+      });
+  }
+
+  getOrders(c: any) {
+    this.router.navigateByUrl("/orders/" + c.id);
+  }
+}
+
+customers.component.html
+
+code
+Html
+play_circle
+download
+content_copy
+expand_less
+<div class="container">
+  <table class="table" *ngIf="customers">
+    <thead>
+      <tr>
+        <th>ID</th><th>Name</th><th>Email</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let c of customers._embedded.customers">
+        <td>{{c.id}}</td>
+        <td>{{c.name}}</td>
+        <td>{{c.email}}</td>
+        <td>
+          <button class="btn btn-success" (click)="getOrders(c)">Orders</button>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+C. Orders Component
+
+orders.component.ts
+
+code
+TypeScript
+download
+content_copy
+expand_less
+import { Component, OnInit } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { ActivatedRoute, Router } from '@angular/router';
+
+@Component({
+  selector: 'app-orders',
+  templateUrl: './orders.component.html',
+  styleUrls: ['./orders.component.css']
+})
+export class OrdersComponent implements OnInit {
+  orders: any;
+  customerId!: number;
+
+  constructor(private http: HttpClient, private router: Router, private route: ActivatedRoute) {
+    this.customerId = route.snapshot.params['customerId'];
+  }
+
+  ngOnInit(): void {
+    this.http.get("http://localhost:9999/order-service/orders/search/byCustomerId?customerId=" + this.customerId + "&projection=fullOrder")
+      .subscribe({
+        next: (data) => {
+          this.orders = data;
+        },
+        error: (err) => { }
+      });
+  }
+
+  getOrderDetails(o: any) {
+    this.router.navigateByUrl("/order-details/" + o.id);
+  }
+}
+
+orders.component.html
+
+code
+Html
+play_circle
+download
+content_copy
+expand_less
+<div class="container" *ngIf="orders">
+  <table class="table">
+    <thead>
+      <tr>
+        <th>ID</th><th>Date</th><th>Status</th><th>CustomerId</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let o of orders._embedded.orders">
+        <td>{{o.id}}</td>
+        <td>{{o.createdAt | date : 'dd/MM/yyyy'}}</td>
+        <td>{{o.status}}</td>
+        <td>{{o.customerId}}</td>
+        <td>
+          <button class="btn btn-success" (click)="getOrderDetails(o)">Order Details</button>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+D. OrderDetails Component
+
+order-details.component.ts
+
+code
+TypeScript
+download
+content_copy
+expand_less
+import { Component, OnInit } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { ActivatedRoute, Router } from '@angular/router';
+
+@Component({
+  selector: 'app-order-details',
+  templateUrl: './order-details.component.html',
+  styleUrls: ['./order-details.component.css']
+})
+export class OrderDetailsComponent implements OnInit {
+  orderDetails: any;
+  orderId!: number;
+
+  constructor(private http: HttpClient, private router: Router, private route: ActivatedRoute) {
+    this.orderId = route.snapshot.params['orderId'];
+  }
+
+  ngOnInit(): void {
+    this.http.get("http://localhost:9999/order-service/orders/" + this.orderId + "?projection=fullOrder")
+      .subscribe({
+        next: (data) => {
+          this.orderDetails = data;
+        },
+        error: (err) => { }
+      });
+  }
+}
+
+order-details.component.html
+
+code
+Html
+play_circle
+download
+content_copy
+expand_less
+<div class="container" *ngIf="orderDetails">
+  <div class="row">
+    <div class="col-md-6">
+      <div class="card">
+        <div class="card-header">Order ID: {{orderDetails.id}}</div>
+        <div class="card-body">
+          <ul class="list-group">
+            <li class="list-group-item">Order Id: {{orderDetails.id}}</li>
+            <li class="list-group-item">Date: {{orderDetails.createdAt | date : 'dd/MM/yyyy'}}</li>
+            <li class="list-group-item">Status: {{orderDetails.status}}</li>
+            <li class="list-group-item">Customer Id: {{orderDetails.customerId}}</li>
+            <li class="list-group-item">Customer Name: {{orderDetails.customer.name}}</li>
+            <li class="list-group-item">Customer Email: {{orderDetails.customer.email}}</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="card">
+        <div class="card-header">Product Items</div>
+        <div class="card-body">
+          <table class="table table-sm">
+            <thead>
+              <tr>
+                <th>Product Id</th><th>Product Name</th><th>Quantity</th><th>Price</th><th>Discount</th><th>Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let pi of orderDetails.productItems">
+                <td>{{pi.product.id}}</td>
+                <td>{{pi.product.name}}</td>
+                <td>{{pi.quantity}}</td>
+                <td>{{pi.price | number : '0.2-2'}}</td>
+                <td>{{pi.discount | number : '0.2-2'}}</td>
+                <td>{{pi.amount | number : '0.2-2'}}</td>
+              </tr>
+              <tr>
+                 <td colspan="5" class="text-end">Total</td>
+                 <td class="text-end">{{orderDetails.total | number : '0.2-2'}}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+5. Debugging & Logic Explanation
+
+White Label Error & Path Mapping:
+The instructor encountered a "White Label Error Page" when accessing http://localhost:9999/order-service/orders/search/byCustomerId. This initially occurred because the method findByCustomerId did not exist in the OrderRepository.
+
+Logic Resolution:
+
+The instructor added the method List<Order> findByCustomerId(@Param("customerId") Long customerId); to OrderRepository.java.
+
+He annotated it with @RestResource(path = "/byCustomerId") to explicitly expose it at the URL path /search/byCustomerId.
+
+This enabled the backend to correctly map the request from the Angular frontend to the database query.
+
+H2 Database Issue:
+During development, the instructor noted that the Inventory Service returned errors because the H2 in-memory database connection had timed out/closed due to inactivity. He resolved this by simply restarting the specific microservice (InventoryServiceApplication).
+
+
+
+
+
+
+
+
+
+
+
+
+This is a detailed, step-by-step breakdown of the coding session in the video, treating the video as a source of truth for file contents, commands execution, and architectural logic.
+
+The session alternates between the Angular Frontend (VS Code) and the Spring Boot Backend (IntelliJ IDEA).
+
+1. Terminal Commands (Project Setup)
+
+The instructor initializes the Angular project and installs Bootstrap.
+
+Command Line (Windows Terminal):
+
+code
+Bash
+download
+content_copy
+expand_less
+# Creating the project
+ng new ecom-web-app
+# (Selected CSS for stylesheet format)
+
+# Installing Bootstrap dependencies
+npm install --save bootstrap bootstrap-icons
+
+# Generating components throughout the video
+ng g c products
+ng g c customers
+ng g c orders
+ng g c order-details
+2. Global Angular Configuration
+
+File: angular.json
+Action: Adding Bootstrap CSS and JS bundles to the build configuration.
+
+code
+JSON
+download
+content_copy
+expand_less
+"styles": [
+  "src/styles.css",
+  "node_modules/bootstrap/dist/css/bootstrap.min.css",
+  "node_modules/bootstrap-icons/font/bootstrap-icons.css" // Assumed based on install, or added to styles.css
+],
+"scripts": [
+  "node_modules/bootstrap/dist/js/bootstrap.bundle.js"
+]
+3. Backend Configuration: Gateway Service (Java)
+
+Context: The frontend runs on port 4200, backend on 9999. Browser blocks requests due to CORS. The instructor fixes this in the Spring Cloud Gateway.
+
+File: GatewayServiceApplication.java (or a configuration class within the Gateway project)
+
+code
+Java
+download
+content_copy
+expand_less
+@Bean
+public CorsWebFilter corsWebFilter() {
+    CorsConfiguration corsConfig = new CorsConfiguration();
+    corsConfig.setAllowedOrigins(Arrays.asList("http://localhost:4200"));
+    corsConfig.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+    corsConfig.setAllowedHeaders(Arrays.asList("*"));
+
+    UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+    source.registerCorsConfiguration("/**", corsConfig);
+
+    return new CorsWebFilter(source);
+}
+4. Angular: Routing Module
+
+File: src/app/app-routing.module.ts
+Action: Defining navigation paths.
+
+code
+TypeScript
+download
+content_copy
+expand_less
+const routes: Routes = [
+  { path: "products", component: ProductsComponent },
+  { path: "customers", component: CustomersComponent },
+  { path: "orders/:customerId", component: OrdersComponent },
+  { path: "order-details/:orderId", component: OrderDetailsComponent }
+];
+
+@NgModule({
+  imports: [RouterModule.forRoot(routes)],
+  exports: [RouterModule]
+})
+export class AppRoutingModule { }
+5. Angular: App Component (Navbar)
+
+File: src/app/app.component.html
+Action: Setting up the Bootstrap Navbar and the router outlet.
+
+code
+Html
+play_circle
+download
+content_copy
+expand_less
+<nav class="navbar navbar-expand-sm bg-light navbar-light">
+  <div class="container-fluid">
+    <ul class="navbar-nav">
+      <li class="nav-item">
+        <a class="nav-link" routerLink="/products">Products</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" routerLink="/customers">Customers</a>
+      </li>
+    </ul>
+  </div>
+</nav>
+<div class="container">
+  <router-outlet></router-outlet>
+</div>
+6. Angular: Products Component
+
+File: src/app/products/products.component.ts
+Action: Fetching products from the Inventory Service via Gateway.
+
+code
+TypeScript
+download
+content_copy
+expand_less
+export class ProductsComponent implements OnInit {
+  products: any;
+
+  constructor(private http: HttpClient) {}
+
+  ngOnInit(): void {
+    this.http.get("http://localhost:9999/inventory-service/products?projection=fullProduct")
+      .subscribe({
+        next: (data: any) => {
+          this.products = data;
+        },
+        error: (err) => {}
+      });
+  }
+}
+
+File: src/app/products/products.component.html
+
+code
+Html
+play_circle
+download
+content_copy
+expand_less
+<div class="container">
+  <table class="table" *ngIf="products">
+    <thead>
+      <tr>
+        <th>ID</th><th>Name</th><th>Price</th><th>Quantity</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let p of products._embedded.products">
+        <td>{{p.id}}</td>
+        <td>{{p.name}}</td>
+        <td>{{p.price}}</td>
+        <td>{{p.quantity}}</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+7. Angular: Customers Component
+
+File: src/app/customers/customers.component.ts
+
+code
+TypeScript
+download
+content_copy
+expand_less
+export class CustomersComponent implements OnInit {
+  customers: any;
+
+  constructor(private http: HttpClient, private router: Router) {}
+
+  ngOnInit(): void {
+    this.http.get("http://localhost:9999/customer-service/customers?projection=fullCustomer")
+      .subscribe({
+        next: (data: any) => {
+          this.customers = data;
+        },
+        error: (err) => {}
+      });
+  }
+
+  getOrders(c: any) {
+    this.router.navigateByUrl("/orders/" + c.id);
+  }
+}
+
+File: src/app/customers/customers.component.html
+
+code
+Html
+play_circle
+download
+content_copy
+expand_less
+<div class="container">
+  <table class="table" *ngIf="customers">
+    <thead>
+      <tr>
+        <th>ID</th><th>Name</th><th>Email</th><th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let c of customers._embedded.customers">
+        <td>{{c.id}}</td>
+        <td>{{c.name}}</td>
+        <td>{{c.email}}</td>
+        <td>
+          <button class="btn btn-success" (click)="getOrders(c)">Orders</button>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+8. Backend: Order Service (Java)
+
+Context: The instructor needs to fetch orders for a customer with full details (including the items inside the order). He creates a Projection.
+
+File: org.sid.orderservice.entities.OrderProjection.java
+
+code
+Java
+download
+content_copy
+expand_less
+@Projection(name = "fullOrder", types = Order.class)
+public interface OrderProjection {
+    Long getId();
+    Date getCreatedAt();
+    Long getCustomerId();
+    OrderStatus getStatus();
+    Collection<ProductItem> getProductItems(); // This fetches the relation
+}
+
+File: org.sid.orderservice.entities.Order.java
+Action: Adding a transient method to calculate the total price of an order dynamically.
+
+code
+Java
+download
+content_copy
+expand_less
+@Entity
+@Data @NoArgsConstructor @AllArgsConstructor @ToString
+public class Order {
+    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    private Date createdAt;
+    private OrderStatus status;
+    private Long customerId;
+    @OneToMany(mappedBy = "order")
+    private Collection<ProductItem> productItems;
+
+    @Transient // Not stored in DB
+    public double getTotal() {
+        double sum = 0;
+        for (ProductItem pi : productItems) {
+            sum += pi.getPrice() * pi.getQuantity();
+        }
+        return sum;
+    }
+}
+9. Angular: Orders Component
+
+File: src/app/orders/orders.component.ts
+
+code
+TypeScript
+download
+content_copy
+expand_less
+export class OrdersComponent implements OnInit {
+  orders: any;
+  customerId!: number;
+
+  constructor(private http: HttpClient, private router: Router, private route: ActivatedRoute) {
+    this.customerId = route.snapshot.params['customerId'];
+  }
+
+  ngOnInit(): void {
+    this.http.get("http://localhost:9999/order-service/orders/search/byCustomerId?projection=fullOrder&customerId=" + this.customerId)
+      .subscribe({
+        next: (data: any) => {
+          this.orders = data;
+        },
+        error: (err) => {}
+      });
+  }
+
+  getOrderDetails(o: any) {
+    this.router.navigateByUrl("/order-details/" + o.id);
+  }
+}
+
+File: src/app/orders/orders.component.html
+
+code
+Html
+play_circle
+download
+content_copy
+expand_less
+<div class="container">
+  <table class="table" *ngIf="orders">
+    <thead>
+      <tr>
+        <th>ID</th><th>Date</th><th>Status</th><th>CustomerID</th><th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let o of orders._embedded.orders">
+        <td>{{o.id}}</td>
+        <td>{{o.createdAt | date : 'dd/MM/yyyy'}}</td>
+        <td>{{o.status}}</td>
+        <td>{{o.customerId}}</td>
+        <td>
+          <button class="btn btn-success" (click)="getOrderDetails(o)">Order Details</button>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+10. Angular: Order Details Component
+
+File: src/app/order-details/order-details.component.ts
+
+code
+TypeScript
+download
+content_copy
+expand_less
+export class OrderDetailsComponent implements OnInit {
+  orderId!: number;
+  orderDetails: any;
+
+  constructor(private http: HttpClient, private route: ActivatedRoute) {
+    this.orderId = route.snapshot.params['orderId'];
+  }
+
+  ngOnInit(): void {
+    this.http.get("http://localhost:9999/order-service/fullOrder/" + this.orderId)
+      .subscribe({
+        next: (data: any) => {
+          this.orderDetails = data;
+        },
+        error: (err) => {}
+      });
+  }
+}
+
+File: src/app/order-details/order-details.component.html
+Action: Displaying the master-detail view of the order.
+
+code
+Html
+play_circle
+download
+content_copy
+expand_less
+<div class="container" *ngIf="orderDetails">
+  <div class="row">
+    <div class="col-md-6">
+      <div class="card">
+        <div class="card-header">Order ID: {{orderDetails.id}}</div>
+        <div class="card-body">
+          <ul class="list-group">
+             <li class="list-group-item">Date: {{orderDetails.createdAt | date : 'dd/MM/yyyy'}}</li>
+             <li class="list-group-item">Status: {{orderDetails.status}}</li>
+             <li class="list-group-item">Customer ID: {{orderDetails.customerId}}</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="card">
+        <div class="card-header">Product Items</div>
+        <div class="card-body">
+           <table class="table table-sm">
+             <thead>
+               <tr>
+                 <th>Product ID</th><th>Name</th><th>Price</th><th>Quantity</th><th>Amount</th>
+               </tr>
+             </thead>
+             <tbody>
+               <tr *ngFor="let pi of orderDetails.productItems">
+                 <td>{{pi.productId}}</td>
+                 <td>{{pi.productName}}</td>
+                 <td>{{pi.price | number : '0.2-2'}}</td>
+                 <td>{{pi.quantity}}</td>
+                 <td>{{pi.amount | number : '0.2-2'}}</td> <!-- amount calculated in backend entity -->
+               </tr>
+               <tr>
+                 <td colspan="4" class="text-end">Total:</td>
+                 <td>{{orderDetails.total | number : '0.2-2'}}</td> <!-- total calculated in backend entity -->
+               </tr>
+             </tbody>
+           </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+
+{
+"timeline": [
+{
+"timestamp": "25:32",
+"event_type": "FILE_EDIT",
+"context": {
+"application": "IntelliJ IDEA",
+"active_file": "gateway-service/src/main/resources/application.yml",
+"current_working_directory": "/gateway-service"
+},
+"code_state": {
+"visible_code_snippet": "spring:\n cloud:\n gateway:\n globalcors:\n corsConfigurations:\n '[/**]':\n allowedOrigins: "http://localhost:4200"\n allowedHeaders: "*"\n allowedMethods:\n - GET\n - POST\n - PUT\n - DELETE",
+"full_file_content_reconstruction": "Standard Spring Cloud Gateway configuration with added Global CORS settings to allow the Angular frontend (localhost:4200) to communicate with the microservices through the gateway.",
+"ast_snapshot": {
+"description": "YAML configuration tree with nested properties for spring.cloud.gateway.globalcors.",
+"nodes": [
+"YAMLDocument",
+"Scalar(spring)",
+"Scalar(cloud)",
+"Scalar(gateway)",
+"Scalar(globalcors)"
+],
+"syntax_validity": "Valid"
+}
+},
+"terminal_state": {
+"command_executed": null,
+"command_output": null
+}
+},
+{
+"timestamp": "35:36",
+"event_type": "FILE_EDIT",
+"context": {
+"application": "IntelliJ IDEA",
+"active_file": "order-service/src/main/java/org/sid/orderservice/repository/OrderRepository.java",
+"current_working_directory": "/order-service"
+},
+"code_state": {
+"visible_code_snippet": "@RepositoryRestResource\npublic interface OrderRepository extends JpaRepository<Order, Long> {\n @RestResource(path = "/byCustomerId")\n List<Order> findByCustomerId(@Param("customerId") Long customerId);\n}",
+"full_file_content_reconstruction": "Spring Data JPA Repository for Order entity, exposing a custom search method via Spring Data REST.",
+"ast_snapshot": {
+"description": "Java Interface extending JpaRepository with one method declaration annotated for REST exposure.",
+"nodes": [
+"InterfaceDeclaration",
+"Annotation(@RepositoryRestResource)",
+"MethodDeclaration(findByCustomerId)",
+"Annotation(@RestResource)",
+"Annotation(@Param)"
+],
+"syntax_validity": "Valid"
+}
+},
+"terminal_state": {
+"command_executed": null,
+"command_output": null
+}
+},
+{
+"timestamp": "40:55",
+"event_type": "FILE_EDIT",
+"context": {
+"application": "IntelliJ IDEA",
+"active_file": "order-service/src/main/java/org/sid/orderservice/entities/OrderProjection.java",
+"current_working_directory": "/order-service"
+},
+"code_state": {
+"visible_code_snippet": "@Projection(name="fullOrder", types = Order.class)\npublic interface OrderProjection {\n Long getId();\n Date getCreatedAt();\n Long getCustomerId();\n OrderStatus getStatus();\n}",
+"full_file_content_reconstruction": "Spring Data REST Projection interface to expose specific fields of the Order entity under the name 'fullOrder'.",
+"ast_snapshot": {
+"description": "Java Interface annotated with @Projection defining getter methods matching the Entity properties.",
+"nodes": [
+"InterfaceDeclaration",
+"Annotation(@Projection)",
+"MethodDeclaration(getId)",
+"MethodDeclaration(getCreatedAt)",
+"MethodDeclaration(getCustomerId)",
+"MethodDeclaration(getStatus)"
+],
+"syntax_validity": "Valid"
+}
+},
+"terminal_state": {
+"command_executed": null,
+"command_output": null
+}
+},
+{
+"timestamp": "76:52",
+"event_type": "FILE_EDIT",
+"context": {
+"application": "IntelliJ IDEA",
+"active_file": "order-service/src/main/java/org/sid/orderservice/entities/ProductItem.java",
+"current_working_directory": "/order-service"
+},
+"code_state": {
+"visible_code_snippet": "public double getAmount() {\n return price * quantity * (1 - discount);\n}",
+"full_file_content_reconstruction": "ProductItem entity class with a calculated method getAmount() added to compute the total price of the line item.",
+"ast_snapshot": {
+"description": "Java Class with a new public method calculating a double value based on fields.",
+"nodes": [
+"ClassDeclaration(ProductItem)",
+"MethodDeclaration(getAmount)",
+"ReturnStatement",
+"BinaryExpression"
+],
+"syntax_validity": "Valid"
+}
+},
+"terminal_state": {
+"command_executed": null,
+"command_output": null
+}
+},
+{
+"timestamp": "77:43",
+"event_type": "FILE_EDIT",
+"context": {
+"application": "IntelliJ IDEA",
+"active_file": "order-service/src/main/java/org/sid/orderservice/entities/Order.java",
+"current_working_directory": "/order-service"
+},
+"code_state": {
+"visible_code_snippet": "public double getTotal() {\n double somme = 0;\n for(ProductItem pi:productItems){\n somme += pi.getAmount();\n }\n return somme;\n}",
+"full_file_content_reconstruction": "Order entity class with a calculated method getTotal() added to sum up the amounts of all associated ProductItems.",
+"ast_snapshot": {
+"description": "Java Class with a new public method iterating over a collection to calculate a sum.",
+"nodes": [
+"ClassDeclaration(Order)",
+"MethodDeclaration(getTotal)",
+"VariableDeclaration(somme)",
+"ForEachStatement",
+"ExpressionStatement(Assignment)",
+"ReturnStatement"
+],
+"syntax_validity": "Valid"
+}
+},
+"terminal_state": {
+"command_executed": null,
+"command_output": null
+}
+}
+],
+"final_file_tree": {
+"gateway-service/src/main/resources/application.yml": "YAML config including globalcors for localhost:4200.",
+"order-service/src/main/java/org/sid/orderservice/repository/OrderRepository.java": "Interface extending JpaRepository with findByCustomerId exposed via REST.",
+"order-service/src/main/java/org/sid/orderservice/entities/OrderProjection.java": "Projection interface for 'fullOrder'.",
+"order-service/src/main/java/org/sid/orderservice/entities/ProductItem.java": "Entity with getAmount() calculation.",
+"order-service/src/main/java/org/sid/orderservice/entities/Order.java": "Entity with getTotal() calculation summing product items."
+}
+}
+
+
+
+
+
+
+
+
+
+{
+"timeline": [
+{
+"timestamp": "00:56",
+"event_type": "SHELL_COMMAND",
+"context": {
+"application": "Terminal",
+"current_working_directory": "C:\ms-enset"
+},
+"terminal_state": {
+"command_executed": "ng new ecom-web-app",
+"command_output": "Would you like to add Angular routing? (y/N) y\nWhich stylesheet format would you like to use? CSS"
+}
+},
+{
+"timestamp": "02:46",
+"event_type": "SHELL_COMMAND",
+"context": {
+"application": "Terminal",
+"current_working_directory": "C:\ms-enset\ecom-web-app"
+},
+"terminal_state": {
+"command_executed": "ng serve",
+"command_output": "Generating browser application bundles..."
+}
+},
+{
+"timestamp": "04:15",
+"event_type": "SHELL_COMMAND",
+"context": {
+"application": "Terminal",
+"current_working_directory": "C:\ms-enset\ecom-web-app"
+},
+"terminal_state": {
+"command_executed": "npm install --save bootstrap bootstrap-icons",
+"command_output": "added 3 packages..."
+}
+},
+{
+"timestamp": "06:30",
+"event_type": "FILE_EDIT",
+"context": {
+"application": "VS Code",
+"active_file": "angular.json"
+},
+"code_state": {
+"visible_code_snippet": ""styles": [\n "src/styles.css",\n "node_modules/bootstrap/dist/css/bootstrap.min.css"\n],",
+"ast_snapshot": {
+"description": "Adding bootstrap CSS to the styles configuration array.",
+"nodes": [
+"JSONString"
+],
+"syntax_validity": "Valid"
+}
+}
+},
+{
+"timestamp": "07:13",
+"event_type": "FILE_EDIT",
+"context": {
+"application": "VS Code",
+"active_file": "angular.json"
+},
+"code_state": {
+"visible_code_snippet": ""scripts": [\n "node_modules/bootstrap/dist/js/bootstrap.bundle.js"\n]",
+"ast_snapshot": {
+"description": "Adding bootstrap JS bundle to the scripts configuration array.",
+"nodes": [
+"JSONString"
+],
+"syntax_validity": "Valid"
+}
+}
+},
+{
+"timestamp": "09:29",
+"event_type": "SHELL_COMMAND",
+"context": {
+"application": "Terminal",
+"current_working_directory": "C:\ms-enset\ecom-web-app"
+},
+"terminal_state": {
+"command_executed": "ng g c products",
+"command_output": "CREATE src/app/products/products.component.html (23 bytes)..."
+}
+},
+{
+"timestamp": "10:05",
+"event_type": "FILE_EDIT",
+"context": {
+"application": "VS Code",
+"active_file": "src/app/app.module.ts"
+},
+"code_state": {
+"visible_code_snippet": "imports: [\n BrowserModule,\n AppRoutingModule,\n HttpClientModule\n],",
+"ast_snapshot": {
+"description": "Importing HttpClientModule into the main App module.",
+"nodes": [
+"ArrayExpression",
+"Identifier"
+],
+"syntax_validity": "Valid"
+}
+}
+},
+{
+"timestamp": "12:41",
+"event_type": "FILE_EDIT",
+"context": {
+"application": "VS Code",
+"active_file": "src/app/products/products.component.ts"
+},
+"code_state": {
+"visible_code_snippet": "ngOnInit(): void {\n this.http.get("http://localhost:9999/inventory-service/products").subscribe({\n next : (data) => {\n this.products = data;\n },\n error : (err) => {}\n });\n}",
+"ast_snapshot": {
+"description": "Making an HTTP GET request to the gateway to fetch products in ngOnInit.",
+"nodes": [
+"CallExpression",
+"ArrowFunctionExpression"
+],
+"syntax_validity": "Valid"
+}
+}
+},
+{
+"timestamp": "21:38",
+"event_type": "FILE_EDIT",
+"context": {
+"application": "VS Code",
+"active_file": "src/app/app-routing.module.ts"
+},
+"code_state": {
+"visible_code_snippet": "const routes: Routes = [\n { path: "products", component: ProductsComponent },\n { path: "customers", component: CustomersComponent }\n];",
+"ast_snapshot": {
+"description": "Defining routes for products and customers.",
+"nodes": [
+"VariableDeclaration",
+"ArrayExpression",
+"ObjectExpression"
+],
+"syntax_validity": "Valid"
+}
+}
+},
+{
+"timestamp": "25:32",
+"event_type": "FILE_EDIT",
+"context": {
+"application": "IntelliJ IDEA",
+"active_file": "gateway-service/src/main/resources/application.yml"
+},
+"code_state": {
+"visible_code_snippet": "spring:\n cloud:\n gateway:\n globalcors:\n corsConfigurations:\n '[/**]':\n allowedOrigins: "http://localhost:4200"\n allowedHeaders: "*"\n allowedMethods:\n - GET\n - POST\n - PUT\n - DELETE",
+"ast_snapshot": {
+"description": "Configuring Global CORS in the Gateway service to allow requests from the Angular frontend.",
+"nodes": [
+"YAMLMapping"
+],
+"syntax_validity": "Valid"
+}
+}
+},
+{
+"timestamp": "33:15",
+"event_type": "FILE_EDIT",
+"context": {
+"application": "VS Code",
+"active_file": "src/app/customers/customers.component.html"
+},
+"code_state": {
+"visible_code_snippet": "<table class="table" *ngIf="customers">\n <thead>...</thead>\n <tbody>\n <tr *ngFor="let c of customers">\n <td>{{c.id}}</td>\n <td>{{c.name}}</td>\n <td>{{c.email}}</td>\n <td>\n <button (click)="getOrders(c)" class="btn btn-success">Orders</button>\n </td>\n </tr>\n </tbody>\n</table>",
+"full_file_content_reconstruction": "HTML template displaying a list of customers in a bootstrap table with a button to view orders.",
+"ast_snapshot": {
+"description": "Table iterating over customers array.",
+"nodes": [
+"Element",
+"Attribute(ngFor)"
+],
+"syntax_validity": "Valid"
+}
+}
+},
+{
+"timestamp": "35:46",
+"event_type": "FILE_EDIT",
+"context": {
+"application": "IntelliJ IDEA",
+"active_file": "OrderProjection.java"
+},
+"code_state": {
+"visible_code_snippet": "@Projection(name="fullOrder", types = Order.class)\npublic interface OrderProjection {\n Long getId();\n Date getCreatedAt();\n Long getCustomerId();\n OrderStatus getStatus();\n public double getAmount();\n}",
+"ast_snapshot": {
+"description": "Creating a Spring Data REST Projection to expose specific fields of the Order entity, including the calculated amount.",
+"nodes": [
+"InterfaceDeclaration",
+"Annotation",
+"MethodDeclaration"
+],
+"syntax_validity": "Valid"
+}
+}
+},
+{
+"timestamp": "46:00",
+"event_type": "SHELL_COMMAND",
+"context": {
+"application": "Terminal",
+"current_working_directory": "C:\ms-enset\ecom-web-app"
+},
+"terminal_state": {
+"command_executed": "ng g c orders",
+"command_output": "CREATE src/app/orders/orders.component.ts..."
+}
+},
+{
+"timestamp": "53:33",
+"event_type": "FILE_EDIT",
+"context": {
+"application": "VS Code",
+"active_file": "src/app/orders/orders.component.ts"
+},
+"code_state": {
+"visible_code_snippet": "ngOnInit(): void {\n this.http.get("http://localhost:9999/order-service/orders/search/byCustomerId?projection=fullOrder&customerId=" + this.customerId)\n .subscribe({\n next: (data) => { this.orders = data; }\n });\n}",
+"ast_snapshot": {
+"description": "Fetching orders for a specific customer using the created projection.",
+"nodes": [
+"CallExpression",
+"BinaryExpression (String concatenation)"
+],
+"syntax_validity": "Valid"
+}
+}
+},
+{
+"timestamp": "58:30",
+"event_type": "SHELL_COMMAND",
+"context": {
+"application": "Terminal",
+"current_working_directory": "C:\ms-enset\ecom-web-app"
+},
+"terminal_state": {
+"command_executed": "ng g c order-details",
+"command_output": "CREATE src/app/order-details/order-details.component.ts..."
+}
+},
+{
+"timestamp": "79:30",
+"event_type": "FILE_EDIT",
+"context": {
+"application": "VS Code",
+"active_file": "src/app/order-details/order-details.component.html"
+},
+"code_state": {
+"visible_code_snippet": "<table class="table" *ngIf="orderDetails">\n <thead>...</thead>\n <tbody>\n <tr *ngFor="let pi of orderDetails.productItems">\n <td>{{pi.productID}}</td>\n <td>{{pi.product.name}}</td>\n <td>{{pi.price | number: '0.2-2'}}</td>\n <td>{{pi.quantity}}</td>\n <td>{{pi.amount | number: '0.2-2'}}</td>\n </tr>\n </tbody>\n</table>",
+"ast_snapshot": {
+"description": "Displaying product items within an order using ngFor and number pipes for formatting.",
+"nodes": [
+"Element",
+"Interpolation",
+"PipeExpression"
+],
+"syntax_validity": "Valid"
+}
+}
+}
+],
+"final_file_tree": {
+"src/app/app.module.ts": "Includes HttpClientModule, AppRoutingModule, various components.",
+"src/app/products/products.component.ts": "Fetches and stores products list.",
+"src/app/customers/customers.component.ts": "Fetches customers, navigates to orders.",
+"src/app/orders/orders.component.ts": "Fetches orders by customerId using Route params.",
+"src/app/order-details/order-details.component.ts": "Fetches order details including product items.",
+"src/assets/angular.json": "Configured with Bootstrap CSS/JS."
+}
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

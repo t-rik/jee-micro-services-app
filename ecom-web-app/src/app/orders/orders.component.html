@@ -1,0 +1,31 @@
+<div class="container">
+  <div class="card shadow mb-4">
+    <div class="card-header py-3">
+      <h6 class="m-0 font-weight-bold text-primary">Orders</h6>
+    </div>
+    <div class="card-body">
+      <table class="table table-striped" *ngIf="orders">
+        <thead>
+        <tr>
+          <th>ID</th>
+          <th>Order Date</th>
+          <th>Status</th>
+          <th>Customer ID</th>
+          <th>Actions</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr *ngFor="let o of orders._embedded.orders">
+          <td>{{o.id}}</td>
+          <td>{{o.createdAt | date : 'dd/MM/yyyy'}}</td>
+          <td>{{o.status}}</td>
+          <td>{{o.customerId}}</td>
+          <td>
+            <button (click)="getOrderDetails(o)" class="btn btn-success">Order Details</button>
+          </td>
+        </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
